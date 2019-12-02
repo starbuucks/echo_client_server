@@ -6,7 +6,25 @@
 #include <netinet/in.h> // for sockaddr_in
 #include <sys/socket.h> // for socket
 
+#include <thread>
+
 #include "pcap_handle.h"
+
+void get_and_print(int sockfd){
+	const static int BUFSIZE = 1024;
+	char buf[BUFSIZE];
+
+	while(true){
+		ssize_t received = recv(sockfd, buf, BUFSIZE - 1, 0);
+		if (received == 0 || received == -1) {
+			perror("recv failed");
+			exit(0);
+		}
+		buf[received] = '\0';
+		printf("%s\n", buf);
+	}
+
+}
 
 void usage() {
 	printf("syntax : echo_client <host> <port>\n");
@@ -41,11 +59,15 @@ int main(int argc, char* argv[]) {
 	}
 	printf("connected\n");
 
+	thread print_thread(get_and_print, sockfd);
+	print_thread.detach();
+
 	while (true) {
 		const static int BUFSIZE = 1024;
 		char buf[BUFSIZE];
 
-		scanf("%s", buf);
+		int len = read(0, buf, BUFSIZE - 1);
+		if(buf[len-1] == '\n') buf[len-1] = '\0';
 		if (strcmp(buf, "quit") == 0) break;
 
 		ssize_t sent = send(sockfd, buf, strlen(buf), 0);
@@ -53,14 +75,6 @@ int main(int argc, char* argv[]) {
 			perror("send failed");
 			break;
 		}
-
-		ssize_t received = recv(sockfd, buf, BUFSIZE - 1, 0);
-		if (received == 0 || received == -1) {
-			perror("recv failed");
-			break;
-		}
-		buf[received] = '\0';
-		printf("%s\n", buf);
 	}
 
 	close(sockfd);
